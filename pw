@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+import sys
+import re
+import os
+import getpass
+
+import baker
+import requests
+import json
+
+from passwordly import generatePassword, checkHash, createHash
+from config import Config
+
+# Load in the config object
+config = Config(os.path.expanduser('~/.passwordly'))
+config.read()
+
+# Password.ly server url (either from config or default)
+server = config.get('config', 'server') or 'https://password.ly'
+
+
+def ask(question, answers={"yes":True,"y":True,"no":False,"n":False}):
+  'Ask a yes/no (or similar) question on the command line'
+  while True:
+    answer = raw_input(question).lower().strip()
+
+    if answer in answers:
+      return answers[answer]
+    else:
+      print 'Your answer was not recognised'
+
+
+@baker.command
+def sync():
+  'Sync your account up with password.ly'
+  username = raw_input('Username: password.ly/').strip()
+  password = getpass.getpass('Master password: ').strip()
+
+  # Fetch the dump of sites on this side
+  hash = config.findHash(password)
+  ours = config.getAll(hash) if hash else {}
+
+  result = requests.post('%s/%s/sync' % (server, username), {
+    "password": password,
+    "sites": json.dumps(ours)
+    })
+
+  if result.status_code != 200:
+    return 'Could not connect to password.ly sync'
+
+  result = result.json()
+  print result
+
+  if not result['result']:
+    return 'The master password you entered was not found on password.ly'
+
+  theirs = result['sites']
+
+  # sync does not overwrite by default
+  for site in theirs.keys():
+    if not site in ours:
+      config.set(hash, site, theirs[site])
+    elif theirs[site] != ours[site]:
+      # Leave a blank line before so its easier to read
+      print
+
+      print 'Comments for \'%s\' do not match.' % site
+      print '==== OURS ===='
+      print ours[site]
+      print '=== THEIRS ==='
+      print theirs[site]
+      print '=============='
+
+      answer = ask('Which should we take? [O]urs, [T]heirs, [I]gnore: ', {
+         'o': 'ours', 'ours': 'ours',
+         't': 'theirs', 'theirs': 'theirs',
+         'i': 'ignore', 'ignore': 'ignore'
+        })
+
+      if answer is 'ours':
+        result = requests.post('%s/%s/save-comment' % (server, username), {
+          "password": password,
+          "site": site,
+          "comment": ours[site]
+        })
+        if result.status_code != 200:
+          print '[ERROR] Could not overwrite comment on password.ly'
+      elif answer is 'theirs':
+        config.set(hash, site, theirs[site])
+
+  config.write()
+
+@baker.command(default=True)
+def generate(site=None):
+  'Generate a new password'
+  password = getpass.getpass('Master password: ').strip()
+
+  # Find the correct group
+  hash = config.findHash(password)
+
+  if not hash:
+    print 'We could not find the master password you entered.'
+    if ask('Would you like to save the new password? [Y/N]: '):
+      hash = createHash(password)
+      config.addHash(hash)
+      config.write()
+    else:
+      sys.exit(1)
+
+  # Ask for the site if it wasn't provided
+  if site is None:
+    site = raw_input('Site: ').strip()
+
+  print
+  print 'Password:', generatePassword(password, site)
+
+  comment = config.get(hash, site)
+
+  if comment is None:
+    print 'The site you entered was not recognised.'
+    if ask('Would you like to save it? [Y/N]: '):
+      print 'Please enter a comment (Ctrl-D to save):'
+      comment = sys.stdin.read().strip()
+      config.set(hash, site, comment)
+      config.write()
+  elif comment.strip():
+    print '[Comment]'
+    print comment.strip()
+  else:
+    print 'Comment: none.'
+
+
+if __name__ == '__main__':
+  baker.run()
