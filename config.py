@@ -6,6 +6,7 @@ from passwordly import checkHash
 class Config:
   def __init__(self, filename):
     self.parser = ConfigParser.RawConfigParser()
+    self.parser.add_section('config')
     self.filename = filename
 
   def read(self):
@@ -27,7 +28,7 @@ class Config:
     'Find a hash given the password'
     # Look for an existing hash
     for hash in self.getHashes():
-      if checkHash(password, hash):
+      if hash[:4] == '$2a$' and checkHash(password, hash):
         return hash
     return None
 
@@ -36,6 +37,9 @@ class Config:
       return self.parser.get(hash, site)
     except ConfigParser.NoOptionError:
       return None
+
+  def getSites(self, hash):
+    return [site for (site, comment) in self.parser.items(hash)]
 
   def getAll(self, hash):
     return {site:comment for (site, comment) in self.parser.items(hash)}

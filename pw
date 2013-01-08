@@ -3,12 +3,14 @@ import sys
 import re
 import os
 import getpass
+import readline
 
 import baker
 import requests
 import json
 
 from passwordly import generatePassword, checkHash, createHash
+from cli import ask, read_autocomplete
 from config import Config
 
 # Load in the config object
@@ -17,18 +19,6 @@ config.read()
 
 # Password.ly server url (either from config or default)
 server = config.get('config', 'server') or 'https://password.ly'
-
-
-def ask(question, answers={"yes":True,"y":True,"no":False,"n":False}):
-  'Ask a yes/no (or similar) question on the command line'
-  while True:
-    answer = raw_input(question).lower().strip()
-
-    if answer in answers:
-      return answers[answer]
-    else:
-      print 'Your answer was not recognised'
-
 
 @baker.command
 def sync():
@@ -109,7 +99,7 @@ def generate(site=None):
 
   # Ask for the site if it wasn't provided
   if site is None:
-    site = raw_input('Site: ').strip()
+    site = read_autocomplete('Site: ', config.getSites(hash))
 
   print
   print 'Password:', generatePassword(password, site)
