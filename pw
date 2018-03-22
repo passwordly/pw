@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+import csv
 import sys
 import re
 import os
@@ -23,7 +24,7 @@ server = config.get('config', 'server') or 'https://password.ly'
 @baker.command
 def sync():
   'Sync your account up with password.ly'
-  username = raw_input('Username: password.ly/').strip()
+  username = input('Username: password.ly/').strip()
   password = getpass.getpass('Master password: ').strip()
 
   # Fetch the dump of sites on this side
@@ -39,7 +40,7 @@ def sync():
     return 'Could not connect to password.ly sync'
 
   result = result.json()
-  print result
+  print(result)
 
   if not result['result']:
     return 'The master password you entered was not found on password.ly'
@@ -47,19 +48,19 @@ def sync():
   theirs = result['sites']
 
   # sync does not overwrite by default
-  for site in theirs.keys():
+  for site in list(theirs.keys()):
     if not site in ours:
       config.set(hash, site, theirs[site])
     elif theirs[site] != ours[site]:
       # Leave a blank line before so its easier to read
-      print
+      print()
 
-      print 'Comments for \'%s\' do not match.' % site
-      print '==== OURS ===='
-      print ours[site]
-      print '=== THEIRS ==='
-      print theirs[site]
-      print '=============='
+      print('Comments for \'%s\' do not match.' % site)
+      print('==== OURS ====')
+      print(ours[site])
+      print('=== THEIRS ===')
+      print(theirs[site])
+      print('==============')
 
       answer = ask('Which should we take? [O]urs, [T]heirs, [I]gnore: ', {
          'o': 'ours', 'ours': 'ours',
@@ -74,11 +75,22 @@ def sync():
           "comment": ours[site]
         })
         if result.status_code != 200:
-          print '[ERROR] Could not overwrite comment on password.ly'
+          print('[ERROR] Could not overwrite comment on password.ly')
       elif answer is 'theirs':
         config.set(hash, site, theirs[site])
 
   config.write()
+
+@baker.command
+def dump():
+  w = csv.writer(sys.stdout)
+  for site in config.getSites(hash):
+    comment = config.get(hash, site)
+    w.writerow([
+        # title,URL,username,password,notes,custom field 1,custom field 2
+        site, None, None, generatePassword(password, site), comment,
+        None, None
+    ])
 
 @baker.command(default=True)
 def generate(site=None):
@@ -89,7 +101,7 @@ def generate(site=None):
   hash = config.findHash(password)
 
   if not hash:
-    print 'We could not find the master password you entered.'
+    print('We could not find the master password you entered.')
     if ask('Would you like to save the new password? [Y/N]: '):
       hash = createHash(password)
       config.addHash(hash)
@@ -97,27 +109,26 @@ def generate(site=None):
     else:
       sys.exit(1)
 
-  # Ask for the site if it wasn't provided
   if site is None:
     site = read_autocomplete('Site: ', config.getSites(hash))
 
-  print
-  print 'Password:', generatePassword(password, site)
+  print()
+  print('Password:', generatePassword(password, site))
 
   comment = config.get(hash, site)
 
   if comment is None:
-    print 'The site you entered was not recognised.'
+    print('The site you entered was not recognised.')
     if ask('Would you like to save it? [Y/N]: '):
-      print 'Please enter a comment (Ctrl-D to save):'
+      print('Please enter a comment (Ctrl-D to save):')
       comment = sys.stdin.read().strip()
       config.set(hash, site, comment)
       config.write()
   elif comment.strip():
-    print '[Comment]'
-    print comment.strip()
+    print('[Comment]')
+    print(comment.strip())
   else:
-    print 'Comment: none.'
+    print('Comment: none.')
 
 
 if __name__ == '__main__':

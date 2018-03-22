@@ -1,11 +1,12 @@
 import os
-import ConfigParser
+import configparser
 
+from collections import OrderedDict
 from passwordly import checkHash
 
 class Config:
   def __init__(self, filename):
-    self.parser = ConfigParser.RawConfigParser()
+    self.parser = configparser.RawConfigParser()
     self.parser.add_section('config')
     self.filename = filename
 
@@ -13,8 +14,14 @@ class Config:
     self.parser.read(self.filename)
 
   def write(self):
+    output_config = configparser.RawConfigParser()
+    output_config.read_dict(OrderedDict({
+      section: OrderedDict(sorted(values.items()))
+      for section, values in sorted(self.parser.items())
+    }))
+
     with open(self.filename+'.tmp', 'w') as configfile:
-      self.parser.write(configfile)
+      output_config.write(configfile)
 
     os.rename(self.filename+'.tmp', self.filename)
 
@@ -35,7 +42,7 @@ class Config:
   def get(self, hash, site):
     try:
       return self.parser.get(hash, site)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
       return None
 
   def getSites(self, hash):

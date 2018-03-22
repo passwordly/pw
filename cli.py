@@ -3,12 +3,12 @@ import readline
 def ask(question, answers={"yes":True,"y":True,"no":False,"n":False}):
   'Ask a yes/no (or similar) question on the command line'
   while True:
-    answer = raw_input(question).lower().strip()
+    answer = input(question).lower().strip()
 
     if answer in answers:
       return answers[answer]
     else:
-      print 'Your answer was not recognised'
+      print('Your answer was not recognised')
 
 def read_autocomplete(prefix, options):
   def completer(text, state):
@@ -21,7 +21,7 @@ def read_autocomplete(prefix, options):
   readline.parse_and_bind("tab: complete")
   readline.set_completer(completer)
 
-  result = raw_input(prefix)
+  result = input(prefix)
 
   readline.set_completer(lambda text, state: None)
 
