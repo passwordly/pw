@@ -84,6 +84,7 @@ def sync():
 @baker.command
 def dump():
   w = csv.writer(sys.stdout)
+  (password, hash) = read_password()
   for site in config.getSites(hash):
     comment = config.get(hash, site)
     w.writerow([
@@ -92,9 +93,7 @@ def dump():
         None, None
     ])
 
-@baker.command(default=True)
-def generate(site=None):
-  'Generate a new password'
+def read_password(allow_save=False):
   password = getpass.getpass('Master password: ').strip()
 
   # Find the correct group
@@ -102,13 +101,20 @@ def generate(site=None):
 
   if not hash:
     print('We could not find the master password you entered.')
-    if ask('Would you like to save the new password? [Y/N]: '):
+    if allow_save and ask('Would you like to save the new password? [Y/N]: '):
       hash = createHash(password)
       config.addHash(hash)
       config.write()
     else:
       sys.exit(1)
 
+  return (password, hash)
+
+@baker.command(default=True)
+def generate(site=None):
+  'Generate a new password'
+
+  (password, hash) = read_password(allow_save=True)
   if site is None:
     site = read_autocomplete('Site: ', config.getSites(hash))
 
